@@ -1,0 +1,63 @@
+---
+title: "PracticalMachineLearning_Project"
+author: "Michelle"
+date: "March 15, 2017"
+output: html_document
+---
+
+This is the week 4 project for Practical Machine Learning.  Background pulled from assignment page:
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement – a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset).
+
+```{r, echo=FALSE}
+rm(list=ls())
+library(caret)
+library(randomForest)
+```
+
+Read in the training and testing data set.  The testing dataset will be used at the end to test how the model did.  There are many variables in this dataset that will not be helpful with predicting outcome.  Remove the first 7 columns as those are time stamps, and information on who the subject was. We just want to predict if the movement was done correctly/incorrectly.  There are 5 possible movements. in the training dataset they are listed as ABCDE. 
+
+```{r}
+training.Dataset = read.csv("pml-training.csv",na.strings = c("NA"," "))
+testing.Dataset  = read.csv("pml-testing.csv",na.strings = c("NA"," "))
+
+#vars 1 through 7 are about the time stamp, person name, etc. None of these will help with
+# prediction so get rid of them. Also after 60 of the original are stdevs, etc. and other
+# things that wont be useful.
+vars.to.keep = names(testing.Dataset[,colSums(is.na(testing.Dataset)) == 0])[8:59]
+train.data  = training.Dataset[,c(vars.to.keep,"classe")]
+test.data   = testing.Dataset[,c(vars.to.keep,"problem_id")]
+classe.opts= unique(train.data$classe)
+classe.opts
+```
+
+Now we have our training data in order to predict outcomes. From this we use 60% to train the algorithm, and 40% to test it.  We partition the data in this way. 
+```{r}
+#---------------------
+# guidelines from lecture:
+#   60% for training
+#   40% for testing
+#------------------------------
+
+#Create training and test set 
+inTrain = createDataPartition(y=train.data$classe,p=0.6,list=FALSE)
+training = train.data[inTrain,]
+testing  = train.data[-inTrain,]
+```
+One of the methods of classification used in lecture was the randomForest method. We then look at the confusionMatrix to see how our predictions turned out.  Note that this data will likely be better fit than the validation testing data. This will give us the out-of-sample error. Discussed below results
+```{r}
+#Using random forest model shown in class. This is a classification/regression technique
+randomForest.fit = randomForest(classe ~ ., data = training, ntree = 700)
+#Use this method to predict outcomes for the testing portion of your training set
+rF.fit.predict = predict(randomForest.fit,testing,type = "class")
+#check performance
+confusionMatrix(rF.fit.predict,testing$classe)
+```
+Here we have a high accuracy rate, 0.99 (rounded).  This means there is an 0.01 out of sample error. We expect the accuracy to decline with a new set of data since this test came from the same dataset. Since the results are good, we can apply it to the final test data that was not part of the original training data set. This data has 20 observations.
+```{r}
+#Now test on the validation testing data read in at the beginning
+predict.validTest = predict(randomForest.fit,test.data,type="class")
+
+#Print the results of what was predicted for the validation/test data read in at the beginning
+predict.validTest
+```
